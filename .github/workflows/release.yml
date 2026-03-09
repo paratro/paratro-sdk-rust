@@ -38,6 +38,7 @@ jobs:
         run: |
           VERSION=$(grep 'pub const VERSION' src/lib.rs | sed 's/.*"\(.*\)".*/\1/')
           echo "VERSION=v${VERSION}" >> $GITHUB_OUTPUT
+          echo "RAW_VERSION=${VERSION}" >> $GITHUB_OUTPUT
           echo "Releasing version: v${VERSION}"
 
       - name: Check if tag exists
@@ -75,7 +76,7 @@ jobs:
             ### Installation
             ```toml
             [dependencies]
-            paratro-sdk = "${{ steps.get_version.outputs.VERSION }}"
+            paratro-sdk = "${{ steps.get_version.outputs.RAW_VERSION }}"
             ```
 
             Or via cargo:

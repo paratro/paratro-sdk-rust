@@ -23,7 +23,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-paratro-sdk = "1"
+paratro-sdk = "1.0.0"
 tokio = { version = "1", features = ["full"] }
 ```
 
