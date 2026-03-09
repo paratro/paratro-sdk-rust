@@ -7,6 +7,7 @@ pub mod account;
 pub mod asset;
 pub mod transaction;
 pub mod transfer;
+pub mod webhook;
 
 /// Current version of the MPC SDK.
 pub const VERSION: &str = "1.0.0";
