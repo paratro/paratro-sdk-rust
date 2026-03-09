@@ -131,11 +131,15 @@ fn compute_signature(secret: &str, timestamp: &str, payload: &[u8]) -> String {
     canonical.push(b'.');
     canonical.extend_from_slice(payload);
 
-    let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
-        .expect("HMAC can take key of any size");
+    let mut mac =
+        HmacSha256::new_from_slice(secret.as_bytes()).expect("HMAC can take key of any size");
     mac.update(&canonical);
 
-    format!("{}={}", SIGNATURE_VERSION, hex::encode(mac.finalize().into_bytes()))
+    format!(
+        "{}={}",
+        SIGNATURE_VERSION,
+        hex::encode(mac.finalize().into_bytes())
+    )
 }
 
 /// Constant-time byte comparison to prevent timing attacks.
@@ -190,13 +194,25 @@ mod tests {
     fn test_future_timestamp() {
         let future_ts = "9999999999"; // year 2286
         let sig = sign_payload_with_timestamp(TEST_SECRET, TEST_PAYLOAD, future_ts);
-        let result = verify_payload(TEST_SECRET, future_ts, TEST_PAYLOAD, &sig, DEFAULT_TOLERANCE);
+        let result = verify_payload(
+            TEST_SECRET,
+            future_ts,
+            TEST_PAYLOAD,
+            &sig,
+            DEFAULT_TOLERANCE,
+        );
         assert!(matches!(result, Err(WebhookError::TimestampExpired { .. })));
     }
 
     #[test]
     fn test_invalid_timestamp() {
-        let result = verify_payload(TEST_SECRET, "not-a-number", TEST_PAYLOAD, "v1=abc", DEFAULT_TOLERANCE);
+        let result = verify_payload(
+            TEST_SECRET,
+            "not-a-number",
+            TEST_PAYLOAD,
+            "v1=abc",
+            DEFAULT_TOLERANCE,
+        );
         assert!(matches!(result, Err(WebhookError::InvalidTimestamp(_))));
     }
 

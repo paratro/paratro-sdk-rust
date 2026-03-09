@@ -145,7 +145,10 @@ async fn test_account_create() {
         .await
         .expect("failed to create account");
 
-    assert!(!account.account_id.is_empty(), "expected account ID to be set");
+    assert!(
+        !account.account_id.is_empty(),
+        "expected account ID to be set"
+    );
     println!(
         "Created account: {} (Address: {})",
         account.account_id, account.address
@@ -230,7 +233,10 @@ async fn test_transaction_get_not_found() {
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     let result = client.get_transaction("non-existent-tx-id").await;
-    assert!(result.is_err(), "expected error for non-existent transaction");
+    assert!(
+        result.is_err(),
+        "expected error for non-existent transaction"
+    );
 
     println!(
         "Transaction Get API tested (expected error: {})",
@@ -266,7 +272,13 @@ async fn test_transaction_list() {
         resp.has_more
     );
     for (i, tx) in resp.items.iter().take(5).enumerate() {
-        println!("  {}. {} {} ({})", i + 1, tx.amount, tx.token_symbol, tx.status);
+        println!(
+            "  {}. {} {} ({})",
+            i + 1,
+            tx.amount,
+            tx.token_symbol,
+            tx.status
+        );
     }
 }
 
@@ -328,7 +340,10 @@ async fn test_create_transfer_invalid() {
         })
         .await;
 
-    assert!(result.is_err(), "expected error for invalid transfer request");
+    assert!(
+        result.is_err(),
+        "expected error for invalid transfer request"
+    );
     println!(
         "Transfer API tested (expected error: {})",
         result.unwrap_err()

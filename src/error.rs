@@ -11,7 +11,11 @@ pub struct ErrorBody {
 
 impl std::fmt::Display for ErrorBody {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} - {} (type: {})", self.code, self.message, self.error_type)
+        write!(
+            f,
+            "{} - {} (type: {})",
+            self.code, self.message, self.error_type
+        )
     }
 }
 
@@ -40,5 +44,11 @@ pub fn is_rate_limited(err: &Error) -> bool {
 
 /// Reports whether the error is an authentication/authorization error (401 or 403).
 pub fn is_auth_error(err: &Error) -> bool {
-    matches!(err, Error::Api { status: 401 | 403, .. })
+    matches!(
+        err,
+        Error::Api {
+            status: 401 | 403,
+            ..
+        }
+    )
 }

@@ -61,10 +61,7 @@ impl MpcClient {
     }
 
     /// Retrieves a paginated list of assets.
-    pub async fn list_assets(
-        &self,
-        req: &ListAssetsRequest,
-    ) -> Result<ListAssetsResponse, Error> {
+    pub async fn list_assets(&self, req: &ListAssetsRequest) -> Result<ListAssetsResponse, Error> {
         let mut params = Vec::new();
         if let Some(ref account_id) = req.account_id {
             params.push(("account_id".to_string(), account_id.clone()));
