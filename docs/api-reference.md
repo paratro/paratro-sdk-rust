@@ -323,7 +323,7 @@ Create a new blockchain account under a wallet.
 {
   "wallet_id": "w_01HXYZ...",
   "chain": "ethereum",
-  "network": "mainnet",
+  "account_type": "DEPOSIT",
   "label": "Deposit Account"
 }
 ```
@@ -332,7 +332,7 @@ Create a new blockchain account under a wallet.
 |-------|------|----------|-------------|-------------|
 | `wallet_id` | string | Yes | max 36 chars | Parent wallet ID |
 | `chain` | string | Yes | enum | Blockchain (see below) |
-| `network` | string | Yes | `mainnet` \| `testnet` | Target network |
+| `account_type` | string | No | enum | Account type (e.g. DEPOSIT) |
 | `label` | string | No | max 100 chars | Account label |
 
 **Supported chains:** `ethereum`, `bsc`, `polygon`, `avalanche`, `arbitrum`, `optimism`, `tron`, `bitcoin`, `solana`
@@ -347,7 +347,6 @@ Create a new blockchain account under a wallet.
   "wallet_id": "w_01HXYZ...",
   "client_id": "c_01HXYZ...",
   "address": "0x1a2b3c4d5e6f...",
-  "chain": "ethereum",
   "network": "mainnet",
   "address_type": "DEPOSIT",
   "label": "Deposit Account",
@@ -697,7 +696,6 @@ List transactions with optional filters and pagination.
 | `wallet_id` | string | - | max 36 chars | Filter by wallet |
 | `account_id` | string | - | max 36 chars | Filter by account |
 | `chain` | string | - | enum | Filter by chain |
-| `network` | string | - | `mainnet` \| `testnet` | Filter by network |
 | `page` | integer | 1 | min 1 | Page number |
 | `page_size` | integer | 10 | 1-100 | Items per page |
 

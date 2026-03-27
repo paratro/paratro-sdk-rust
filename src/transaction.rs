@@ -26,7 +26,6 @@ pub struct ListTransactionsRequest {
     pub wallet_id: Option<String>,
     pub account_id: Option<String>,
     pub chain: Option<String>,
-    pub network: Option<String>,
     pub page: Option<i32>,
     pub page_size: Option<i32>,
 }
@@ -60,9 +59,6 @@ impl MpcClient {
         }
         if let Some(ref chain) = req.chain {
             params.push(("chain".to_string(), chain.clone()));
-        }
-        if let Some(ref network) = req.network {
-            params.push(("network".to_string(), network.clone()));
         }
         if let Some(page) = req.page {
             params.push(("page".to_string(), page.to_string()));

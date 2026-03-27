@@ -8,7 +8,8 @@ use crate::error::Error;
 pub struct CreateAccountRequest {
     pub wallet_id: String,
     pub chain: String,
-    pub network: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
 }
@@ -20,7 +21,6 @@ pub struct Account {
     pub wallet_id: String,
     pub client_id: String,
     pub address: String,
-    pub chain: String,
     pub network: String,
     pub address_type: String,
     pub label: String,
