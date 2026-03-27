@@ -139,7 +139,7 @@ async fn test_account_create() {
         .create_account(&CreateAccountRequest {
             wallet_id: wallet_id.to_string(),
             chain: "ethereum".to_string(),
-            network: "mainnet".to_string(),
+            account_type: None,
             label: Some("SDK Test Account".to_string()),
         })
         .await
