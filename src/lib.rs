@@ -10,7 +10,7 @@ pub mod wallet;
 pub mod webhook;
 
 /// Current version of the MPC SDK.
-pub const VERSION: &str = "1.0.0";
+pub const VERSION: &str = "1.1.0";
 
 pub use account::*;
 pub use asset::*;

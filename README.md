@@ -23,7 +23,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-paratro-sdk = "1.0.0"
+paratro-sdk = "1.1.0"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -105,6 +105,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+## Webhooks
+
+Verify and parse incoming webhook events from Paratro:
+
+```rust
+use paratro_sdk::webhook;
+
+fn handle_webhook(body: &[u8], timestamp: &str, signature: &str) -> Result<(), Box<dyn std::error::Error>> {
+    // Verify signature
+    webhook::verify_payload(
+        "whsec_your_webhook_secret",
+        timestamp,
+        body,
+        signature,
+        webhook::DEFAULT_TOLERANCE,
+    )?;
+
+    // Parse event
+    let event = webhook::parse_event(body)?;
+
+    match event.event_type.as_str() {
+        webhook::EVENT_TRANSACTION_CONFIRMED => {
+            println!("Confirmed: {} {} {}", event.txhash, event.amount, event.symbol);
+        }
+        webhook::EVENT_TRANSACTION_CONFIRMING => {
+            println!("Confirming: {} ({}/{})", event.txhash, event.confirmations, event.required_confirmations);
+        }
+        webhook::EVENT_TRANSACTION_FAILED => {
+            println!("Failed: {}", event.txhash);
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+```
+
 ## Configuration
 
 ```rust
@@ -161,7 +198,8 @@ paratro-sdk-rust/
 │   ├── account.rs          # Account API
 │   ├── asset.rs            # Asset API
 │   ├── transaction.rs      # Transaction API
-│   └── transfer.rs         # Transfer API
+│   ├── transfer.rs         # Transfer API
+│   └── webhook.rs          # Webhook verification & event parsing
 ├── tests/                  # Integration tests
 └── docs/                   # Documentation
 ```

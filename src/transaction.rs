@@ -17,6 +17,12 @@ pub struct Transaction {
     pub amount: String,
     pub status: String,
     pub tx_hash: String,
+    #[serde(default)]
+    pub direction: String,
+    #[serde(default)]
+    pub block_number: i64,
+    #[serde(default)]
+    pub confirmations: i32,
     pub created_at: String,
 }
 

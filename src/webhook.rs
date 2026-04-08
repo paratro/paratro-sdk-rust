@@ -31,7 +31,55 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use hmac::{Hmac, Mac};
+use serde::Deserialize;
 use sha2::Sha256;
+
+// Webhook event type constants.
+
+/// Transaction is confirming (waiting for block confirmations).
+pub const EVENT_TRANSACTION_CONFIRMING: &str = "transaction.confirming";
+
+/// Transaction has been confirmed on-chain.
+pub const EVENT_TRANSACTION_CONFIRMED: &str = "transaction.confirmed";
+
+/// Transaction has failed.
+pub const EVENT_TRANSACTION_FAILED: &str = "transaction.failed";
+
+/// A parsed webhook event payload.
+#[derive(Debug, Deserialize)]
+pub struct WebhookEvent {
+    pub id: String,
+    pub event_type: String,
+    pub chain: String,
+    pub txhash: String,
+    #[serde(rename = "type")]
+    pub tx_type: String,
+    pub status: String,
+    pub direction: String,
+    pub from: String,
+    pub to: String,
+    pub symbol: String,
+    pub amount: String,
+    #[serde(default)]
+    pub decimals: i32,
+    #[serde(default)]
+    pub block_number: i64,
+    #[serde(default)]
+    pub confirmations: i32,
+    #[serde(default)]
+    pub required_confirmations: i32,
+    #[serde(default)]
+    pub transaction_type: String,
+    #[serde(default)]
+    pub data: String,
+    #[serde(default)]
+    pub risk_score: i32,
+}
+
+/// Parse a raw JSON webhook body into a [`WebhookEvent`].
+pub fn parse_event(body: &[u8]) -> Result<WebhookEvent, serde_json::Error> {
+    serde_json::from_slice(body)
+}
 
 /// Header name for the Unix timestamp (seconds).
 pub const HEADER_TIMESTAMP: &str = "X-Paratro-Timestamp";
