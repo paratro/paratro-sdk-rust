@@ -52,10 +52,9 @@ pub struct WebhookEvent {
     pub event_type: String,
     pub chain: String,
     pub txhash: String,
-    #[serde(rename = "type")]
-    pub tx_type: String,
-    pub status: String,
+    pub transaction_type: String,
     pub direction: String,
+    pub status: String,
     pub from: String,
     pub to: String,
     pub symbol: String,
@@ -68,8 +67,6 @@ pub struct WebhookEvent {
     pub confirmations: i32,
     #[serde(default)]
     pub required_confirmations: i32,
-    #[serde(default)]
-    pub transaction_type: String,
     #[serde(default)]
     pub data: String,
     #[serde(default)]
