@@ -14,6 +14,7 @@ Official Rust SDK for Paratro MPC Wallet Gateway - A comprehensive Multi-Party C
 - Asset Management - Support for native tokens and ERC20/TRC20 tokens
 - Transfer - Send funds to external addresses with automatic asset resolution
 - Transaction Tracking - Complete transaction history and status tracking
+- x402 Payments - ERC-3009/Permit2 authorization signing, verification, and settlement
 - Secure - Built-in JWT authentication with automatic token management
 - Webhook - HMAC-SHA256 signed webhook notifications for incoming transactions
 
@@ -87,7 +88,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }).await?;
     println!("Transfer: {} ({})", transfer.tx_id, transfer.status);
 
-    // 5. List transactions
+    // 5. x402 Sign (ERC-3009 authorization for agent payments)
+    let sign_resp = client.x402_sign(&paratro_sdk::X402SignRequest {
+        from_address: account.address.clone(),
+        to_address: "0xcccc...".to_string(),
+        chain: "base".to_string(),
+        amount: "0.10".to_string(),
+        valid_after: None,
+        valid_before: 1800000000,
+    }).await?;
+    println!("x402 Signed: {} (status: {})", sign_resp.auth_id, sign_resp.status);
+
+    // 6. x402 Verify (Facilitator: verify a payment signature)
+    let verify_resp = client.x402_verify(serde_json::json!({
+        "x402Version": 2,
+        "paymentPayload": { "payload": {}, "accepted": {} }
+    })).await?;
+    println!("Valid: {}, Payer: {}", verify_resp.is_valid, verify_resp.payer.unwrap_or_default());
+
+    // 7. x402 Settle (Facilitator: execute on-chain settlement)
+    let settle_resp = client.x402_settle(settle_payload).await?;
+    println!("Settled: {}, TxHash: {}", settle_resp.success, settle_resp.transaction.unwrap_or_default());
+
+    // 8. List transactions
     let tx_list = client.list_transactions(&ListTransactionsRequest {
         wallet_id: Some(wallet.wallet_id.clone()),
         page: Some(1),
@@ -199,6 +222,7 @@ paratro-sdk-rust/
 │   ├── asset.rs            # Asset API
 │   ├── transaction.rs      # Transaction API
 │   ├── transfer.rs         # Transfer API
+│   ├── x402.rs             # x402 Payment API (Sign, Verify, Settle)
 │   └── webhook.rs          # Webhook verification & event parsing
 ├── tests/                  # Integration tests
 └── docs/                   # Documentation
