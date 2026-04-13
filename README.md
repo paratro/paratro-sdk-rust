@@ -238,7 +238,7 @@ cargo test
 
 ## Support
 
-- Email: support@paratro.com
+- Email: hello@paratro.com
 - Documentation: https://docs.paratro.com
 - Issues: https://github.com/paratro/paratro-sdk-rust/issues
 
