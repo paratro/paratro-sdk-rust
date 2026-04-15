@@ -97,7 +97,7 @@ impl TokenManager {
         }
 
         let tok_resp: TokenResponse = resp.json().await.map_err(Error::Http)?;
-        let expires_in_secs = (tok_resp.expires_in - 300).max(0) as u64;
+        let expires_in_secs = (tok_resp.expires_in - 120).max(0) as u64;
 
         let token = tok_resp.token.clone();
         *state = Some(TokenState {
