@@ -145,10 +145,7 @@ impl MpcClient {
     }
 
     /// Retrieves the status of a settle transaction.
-    pub async fn x402_settle_status(
-        &self,
-        tx_id: &str,
-    ) -> Result<X402SettleStatusResponse, Error> {
+    pub async fn x402_settle_status(&self, tx_id: &str) -> Result<X402SettleStatusResponse, Error> {
         self.get(&format!("/api/v1/x402/settle/{tx_id}")).await
     }
 }
