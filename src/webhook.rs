@@ -53,7 +53,6 @@ pub struct WebhookEvent {
     pub chain: String,
     pub txhash: String,
     pub transaction_type: String,
-    pub direction: String,
     pub status: String,
     pub from: String,
     pub to: String,
@@ -70,7 +69,9 @@ pub struct WebhookEvent {
     #[serde(default)]
     pub data: String,
     #[serde(default)]
-    pub risk_score: i32,
+    pub risk_score: String,
+    #[serde(default)]
+    pub risk_level: String,
 }
 
 /// Parse a raw JSON webhook body into a [`WebhookEvent`].
