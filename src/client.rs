@@ -53,11 +53,6 @@ impl MpcClient {
         &self.config
     }
 
-    /// Logs out from the API, invalidating the current token.
-    pub async fn logout(&self) -> Result<(), Error> {
-        self.token_manager.logout().await
-    }
-
     pub(crate) async fn post<B: Serialize, R: DeserializeOwned>(
         &self,
         path: &str,

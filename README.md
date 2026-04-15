@@ -121,9 +121,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("TX: {} {} {} ({})", tx.tx_hash, tx.amount, tx.token_symbol, tx.status);
     }
 
-    // Logout when done
-    client.logout().await?;
-
     Ok(())
 }
 ```

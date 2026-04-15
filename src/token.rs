@@ -109,23 +109,4 @@ impl TokenManager {
         Ok(token)
     }
 
-    pub async fn logout(&self) -> Result<(), Error> {
-        let mut state = self.state.write().await;
-
-        let token = match state.as_ref() {
-            Some(s) => s.token.clone(),
-            None => return Ok(()),
-        };
-
-        let url = format!("{}/api/v1/auth/logout", self.base_url);
-        self.http_client
-            .post(&url)
-            .header("Authorization", format!("Bearer {token}"))
-            .send()
-            .await
-            .map_err(Error::Http)?;
-
-        *state = None;
-        Ok(())
-    }
 }

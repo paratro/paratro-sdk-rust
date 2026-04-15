@@ -350,24 +350,6 @@ async fn test_create_transfer_invalid() {
     );
 }
 
-// ============ Authentication Tests ============
-
-#[tokio::test]
-async fn test_logout() {
-    if skip_integration() {
-        return;
-    }
-    let client = match get_test_client() {
-        Some(c) => c,
-        None => return,
-    };
-
-    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-
-    client.logout().await.expect("failed to logout");
-    println!("Logout successful");
-}
-
 // ============ Version Tests ============
 
 #[test]
