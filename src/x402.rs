@@ -16,7 +16,9 @@ pub struct X402SignRequest {
 /// Response from signing an x402 authorization.
 #[derive(Debug, Deserialize)]
 pub struct X402SignResponse {
-    pub auth_id: String,
+    /// Settlement record identifier. Stored server-side in
+    /// pto_x402_settlements; the field remains `tx_id` on the wire for
+    /// backward compatibility.
     pub tx_id: String,
     pub status: String,
     pub nonce: String,
@@ -28,16 +30,19 @@ pub struct X402SignResponse {
     pub error: String,
 }
 
-/// An x402 authorization record.
+/// An x402 facilitator settlement record — covers both Paratro-signed and
+/// (future) externally-signed payloads.
 #[derive(Debug, Deserialize)]
-pub struct X402Authorization {
-    pub auth_id: String,
-    pub tx_id: String,
+pub struct X402Settlement {
+    pub settlement_id: String,
+    #[serde(default)]
+    pub signed_by: String,
     pub from_address: String,
     pub to_address: String,
     pub chain: String,
     pub amount: String,
     pub status: String,
+    #[serde(default, rename = "x402_nonce")]
     pub nonce: String,
     #[serde(default)]
     pub eip712_hash: String,
@@ -50,21 +55,23 @@ pub struct X402Authorization {
     #[serde(default)]
     pub valid_before: String,
     #[serde(default)]
+    pub settle_tx_hash: String,
+    #[serde(default)]
     pub created_at: String,
 }
 
 /// Request to list x402 authorizations.
 #[derive(Debug, Default)]
-pub struct ListX402AuthorizationsRequest {
+pub struct ListX402SettlementsRequest {
     pub page: Option<i32>,
     pub page_size: Option<i32>,
 }
 
 /// Paginated list of x402 authorizations.
 #[derive(Debug, Deserialize)]
-pub struct ListX402AuthorizationsResponse {
+pub struct ListX402SettlementsResponse {
     #[serde(rename = "data")]
-    pub items: Vec<X402Authorization>,
+    pub items: Vec<X402Settlement>,
     pub total: i64,
     pub has_more: bool,
 }
@@ -113,10 +120,10 @@ impl MpcClient {
     }
 
     /// Retrieves a paginated list of x402 authorization records.
-    pub async fn x402_list_authorizations(
+    pub async fn x402_list_settlements(
         &self,
-        req: &ListX402AuthorizationsRequest,
-    ) -> Result<ListX402AuthorizationsResponse, Error> {
+        req: &ListX402SettlementsRequest,
+    ) -> Result<ListX402SettlementsResponse, Error> {
         let mut params = Vec::new();
         if let Some(page) = req.page {
             params.push(("page".to_string(), page.to_string()));
@@ -124,7 +131,7 @@ impl MpcClient {
         if let Some(page_size) = req.page_size {
             params.push(("page_size".to_string(), page_size.to_string()));
         }
-        self.get_with_query("/api/v1/x402/transactions", &params)
+        self.get_with_query("/api/v1/x402/settlements", &params)
             .await
     }
 
