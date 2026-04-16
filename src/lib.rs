@@ -8,6 +8,7 @@ pub mod transaction;
 pub mod transfer;
 pub mod wallet;
 pub mod webhook;
+pub mod whitelist;
 pub mod x402;
 
 /// Current version of the MPC SDK.
@@ -22,4 +23,5 @@ pub use transaction::*;
 pub use transfer::*;
 pub use wallet::*;
 pub use webhook::*;
+pub use whitelist::*;
 pub use x402::*;

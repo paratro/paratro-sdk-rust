@@ -12,7 +12,7 @@
 //! use paratro_sdk::webhook;
 //!
 //! let secret = "whsec_test_secret";
-//! let payload = br#"{"id":"evt_123","chain":"ethereum"}"#;
+//! let payload = br#"{"event_id":"evt_123","chain":"ethereum"}"#;
 //!
 //! // Sign
 //! let (timestamp, signature) = webhook::sign_payload(secret, payload);
@@ -31,7 +31,7 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use hmac::{Hmac, Mac};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 
 // Webhook event type constants.
@@ -45,33 +45,35 @@ pub const EVENT_TRANSACTION_CONFIRMED: &str = "transaction.confirmed";
 /// Transaction has failed.
 pub const EVENT_TRANSACTION_FAILED: &str = "transaction.failed";
 
-/// A parsed webhook event payload.
-#[derive(Debug, Deserialize)]
+/// A parsed webhook event payload (v2 schema).
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookEvent {
-    pub id: String,
+    pub event_id: String,
     pub event_type: String,
-    pub chain: String,
-    pub txhash: String,
-    pub transaction_type: String,
+    pub event_time: String,
+    pub source_id: String,
+    pub wallet_id: String,
+    pub account_id: String,
     pub status: String,
+    pub transaction_type: String,
+    pub chain: String,
+    pub network: String,
+    pub txhash: String,
+    pub block_number: u64,
     pub from: String,
     pub to: String,
     pub symbol: String,
+    pub contract_address: String,
     pub amount: String,
-    #[serde(default)]
     pub decimals: i32,
-    #[serde(default)]
-    pub block_number: i64,
-    #[serde(default)]
-    pub confirmations: i32,
-    #[serde(default)]
-    pub required_confirmations: i32,
-    #[serde(default)]
-    pub data: String,
-    #[serde(default)]
-    pub risk_score: String,
-    #[serde(default)]
+    pub confirmations: u64,
+    pub required_confirmations: u64,
+    pub created_at: String,
+    pub confirmed_at: Option<String>,
+    pub risk_checked: bool,
+    pub risk_score: f64,
     pub risk_level: String,
+    pub data: String,
 }
 
 /// Parse a raw JSON webhook body into a [`WebhookEvent`].
@@ -204,7 +206,7 @@ mod tests {
     use super::*;
 
     const TEST_SECRET: &str = "whsec_test_secret_key_12345";
-    const TEST_PAYLOAD: &[u8] = br#"{"id":"evt_123","chain":"ethereum","txhash":"0xabc"}"#;
+    const TEST_PAYLOAD: &[u8] = br#"{"event_id":"evt_123","chain":"ethereum","txhash":"0xabc"}"#;
 
     #[test]
     fn test_sign_and_verify() {

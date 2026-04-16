@@ -109,6 +109,37 @@ impl MpcClient {
         self.handle_response(resp).await
     }
 
+    pub(crate) async fn delete_with_body<B: Serialize>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<(), Error> {
+        let token = self.token_manager.get_token().await?;
+        let url = format!("{}{}", self.config.base_url, path);
+
+        let resp = self
+            .http_client
+            .delete(&url)
+            .header("Content-Type", "application/json")
+            .header("Authorization", format!("Bearer {token}"))
+            .json(body)
+            .send()
+            .await
+            .map_err(Error::Http)?;
+
+        let status = resp.status().as_u16();
+        if status >= 400 {
+            let body: ErrorBody = resp.json().await.unwrap_or(ErrorBody {
+                code: "unknown".to_string(),
+                error_type: "unknown".to_string(),
+                message: "failed to decode error response".to_string(),
+            });
+            return Err(Error::Api { status, body });
+        }
+
+        Ok(())
+    }
+
     async fn handle_response<R: DeserializeOwned>(
         &self,
         resp: reqwest::Response,
