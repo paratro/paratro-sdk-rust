@@ -74,6 +74,27 @@ impl MpcClient {
         self.handle_response(resp).await
     }
 
+    pub(crate) async fn put<B: Serialize, R: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<R, Error> {
+        let token = self.token_manager.get_token().await?;
+        let url = format!("{}{}", self.config.base_url, path);
+
+        let resp = self
+            .http_client
+            .put(&url)
+            .header("Content-Type", "application/json")
+            .header("Authorization", format!("Bearer {token}"))
+            .json(body)
+            .send()
+            .await
+            .map_err(Error::Http)?;
+
+        self.handle_response(resp).await
+    }
+
     pub(crate) async fn get<R: DeserializeOwned>(&self, path: &str) -> Result<R, Error> {
         let token = self.token_manager.get_token().await?;
         let url = format!("{}{}", self.config.base_url, path);

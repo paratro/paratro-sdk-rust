@@ -8,11 +8,11 @@ pub mod transaction;
 pub mod transfer;
 pub mod wallet;
 pub mod webhook;
-pub mod whitelist;
+pub mod security_factor;
 pub mod x402;
 
 /// Current version of the MPC SDK.
-pub const VERSION: &str = "1.3.0";
+pub const VERSION: &str = "1.6.0";
 
 pub use account::*;
 pub use asset::*;
@@ -23,5 +23,5 @@ pub use transaction::*;
 pub use transfer::*;
 pub use wallet::*;
 pub use webhook::*;
-pub use whitelist::*;
+pub use security_factor::*;
 pub use x402::*;
