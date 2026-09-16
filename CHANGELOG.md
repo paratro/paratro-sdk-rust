@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `WebhookEvent.operation` — the message service now puts `operation` on every
+  webhook event (`TRANSFER` / `PROGRAM_CALL` / `CONTRACT_CALL` for `OUTBOUND`,
+  `DEPOSIT` for deposits, `X402` for `x402.settlement.confirmed`, `TRANSFER` for
+  `transfer.credited`). `webhook::OPERATION_DEPOSIT` / `webhook::OPERATION_X402`
+  name the two values that `transaction::Operation` does not cover.
+- `WebhookEvent.swap_incoming: Option<webhook::SwapIncoming>` — the counter-asset
+  leg of a `PROGRAM_CALL` / `CONTRACT_CALL` swap on `transaction.confirmed` /
+  `transaction.failed`: `token_address`, `symbol`, `amount`, `decimals`, `booked`,
+  `accounting_status` (`SWAP_ACCOUNTING_APPLIED` / `SWAP_ACCOUNTING_REVIEW_REQUIRED` /
+  `SWAP_ACCOUNTING_NOT_APPLICABLE`) plus `reason` / `audit_type` when not booked.
+  `None` on every other event.
+
+Both fields are `#[serde(default)]`: payloads without them still parse.
+
 ## 1.8.1 — 2026-09-15
 
 Aligns the SDK with the gateway's unified transaction API. Every field, path,

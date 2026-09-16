@@ -97,6 +97,68 @@ pub struct WebhookEvent {
     pub risk_score: f64,
     pub risk_level: String,
     pub data: String,
+    /// Operation of the underlying transaction, present on every event:
+    /// `TRANSFER` / `PROGRAM_CALL` / `CONTRACT_CALL` for `OUTBOUND`, `DEPOSIT`
+    /// for deposits, `X402` for `x402.settlement.confirmed`, `TRANSFER` for
+    /// `transfer.credited`. Branch on it together with `transaction_type`.
+    /// Empty only when the payload predates the field.
+    #[serde(default)]
+    pub operation: String,
+    /// Counter-asset leg of a `PROGRAM_CALL` / `CONTRACT_CALL` swap. `Some` only
+    /// on `transaction.confirmed` / `transaction.failed` of those operations;
+    /// `None` on every other event.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swap_incoming: Option<SwapIncoming>,
+}
+
+/// `operation` value of an on-chain deposit (`INBOUND` `transaction.*`).
+pub const OPERATION_DEPOSIT: &str = "DEPOSIT";
+/// `operation` value of an x402 facilitator settlement (`x402.settlement.confirmed`).
+pub const OPERATION_X402: &str = "X402";
+
+/// `accounting_status`: the incoming leg was credited to the asset balance.
+pub const SWAP_ACCOUNTING_APPLIED: &str = "APPLIED";
+/// `accounting_status`: the credit was refused fail-closed; Paratro operations
+/// reconcile it by hand (`booked == false`).
+pub const SWAP_ACCOUNTING_REVIEW_REQUIRED: &str = "REVIEW_REQUIRED";
+/// `accounting_status`: the swap reverted on-chain (`transaction.failed`); there
+/// is no incoming leg to book.
+pub const SWAP_ACCOUNTING_NOT_APPLICABLE: &str = "NOT_APPLICABLE";
+
+/// The incoming (counter-asset) leg the counterparty paid to your
+/// `receive_address` in a `PROGRAM_CALL` / `CONTRACT_CALL` swap, reported in
+/// the top-level `swap_incoming` object of `transaction.confirmed` /
+/// `transaction.failed` (`paratro-mpc-message` `webhook.SwapIncomingPayload`).
+///
+/// Credit your customer's target asset only when `booked` is `true`; a
+/// confirmed outgoing leg does not by itself prove the counter-asset arrived.
+/// The leg is never reported a second time as an `INBOUND` deposit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SwapIncoming {
+    /// Target asset: ERC-20 contract on EVM chains, SPL mint on Solana.
+    pub token_address: String,
+    /// Target token symbol as registered on Paratro; empty when unregistered.
+    pub symbol: String,
+    /// Smallest-unit amount that actually arrived on-chain, as an integer
+    /// string; `"0"` when nothing arrived (swap reverted, or no credit to
+    /// `receive_address` could be derived). It can be non-zero while `booked`
+    /// is `false`: the funds arrived but were not credited — see `reason`.
+    pub amount: String,
+    /// Target token decimals; `0` when unregistered.
+    pub decimals: i32,
+    /// `true` when the incoming leg was credited to the asset balance.
+    pub booked: bool,
+    /// One of [`SWAP_ACCOUNTING_APPLIED`], [`SWAP_ACCOUNTING_REVIEW_REQUIRED`],
+    /// [`SWAP_ACCOUNTING_NOT_APPLICABLE`].
+    pub accounting_status: String,
+    /// Only when `booked` is `false`: `onchain_execution_failed` on
+    /// `transaction.failed`, otherwise the machine-readable refusal cause.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    /// Only when `booked` is `false` and the refusal left an operations audit
+    /// record (`SWAP_INCOMING_*`); quote it when contacting support.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audit_type: Option<String>,
 }
 
 /// Parse a raw JSON webhook body into a [`WebhookEvent`].
@@ -349,13 +411,157 @@ mod tests {
             "from":"0xpayer","to":"0xseller","symbol":"USDC","contract_address":"0xusdc",
             "amount":"1000000","decimals":6,"confirmations":0,"required_confirmations":0,
             "created_at":"2026-09-15T07:59:00Z","confirmed_at":"2026-09-15T08:00:00Z",
-            "risk_checked":false,"risk_score":0.0,"risk_level":"UNSCANNED","data":""
+            "risk_checked":false,"risk_score":0.0,"risk_level":"UNSCANNED","data":"",
+            "operation":"X402"
         }"#;
         let event = parse_event(body).unwrap();
         assert_eq!(event.event_type, EVENT_X402_SETTLEMENT_CONFIRMED);
         assert_eq!(event.transaction_type, "INBOUND");
         assert_eq!(event.status, "CONFIRMED");
         assert_eq!(event.amount, "1000000");
+        // x402 settlements are operation X402, not DEPOSIT (paratro-mpc-message
+        // webhook.ResolveOperation maps X402_SETTLE -> X402).
+        assert_eq!(event.operation, OPERATION_X402);
+        assert!(
+            event.swap_incoming.is_none(),
+            "non-swap events carry no swap_incoming"
+        );
+    }
+
+    // Shapes pinned by paratro-mpc-message internal/dispatcher/swap_webhook_test.go
+    // and documented in paratro-docs features/webhooks.mdx (Swap events).
+    fn swap_event_body(
+        event_type: &str,
+        status: &str,
+        operation: &str,
+        swap_incoming: &str,
+    ) -> Vec<u8> {
+        format!(
+            r#"{{
+            "event_id":"evt_swap_1","event_type":"{event_type}",
+            "event_time":"2026-09-16T09:12:40Z","source_id":"tx-swap","wallet_id":"w-1",
+            "account_id":"a-1","status":"{status}","transaction_type":"OUTBOUND",
+            "operation":"{operation}",
+            "chain":"ethereum","network":"testnet","txhash":"0xswap","block_number":10671204,
+            "from":"0xpayer","to":"0xcounterparty","symbol":"USDC","contract_address":"0xusdc",
+            "amount":"10000000","decimals":6,"confirmations":0,"required_confirmations":6,
+            "created_at":"2026-09-16T09:11:58Z","confirmed_at":"2026-09-16T09:12:40Z",
+            "risk_checked":false,"risk_score":0.0,"risk_level":"UNSCANNED","data":"",
+            "swap_incoming":{swap_incoming}
+        }}"#
+        )
+        .into_bytes()
+    }
+
+    #[test]
+    fn parse_swap_confirmed_booked_leg() {
+        let body = swap_event_body(
+            EVENT_TRANSACTION_CONFIRMED,
+            "CONFIRMED",
+            "CONTRACT_CALL",
+            r#"{"token_address":"0xa55a927f2211fe52188526ed7e779b7298646e75","symbol":"AAPLx",
+                "amount":"42000000000000000","decimals":18,"booked":true,"accounting_status":"APPLIED"}"#,
+        );
+        let event = parse_event(&body).unwrap();
+        assert_eq!(event.operation, "CONTRACT_CALL");
+        // the outgoing leg stays at the top level
+        assert_eq!(event.amount, "10000000");
+        let leg = event
+            .swap_incoming
+            .expect("swap_incoming on a CONTRACT_CALL confirmed event");
+        assert_eq!(
+            leg.token_address,
+            "0xa55a927f2211fe52188526ed7e779b7298646e75"
+        );
+        assert_eq!(leg.symbol, "AAPLx");
+        assert_eq!(leg.amount, "42000000000000000");
+        assert_eq!(leg.decimals, 18);
+        assert!(leg.booked);
+        assert_eq!(leg.accounting_status, SWAP_ACCOUNTING_APPLIED);
+        assert!(
+            leg.reason.is_none() && leg.audit_type.is_none(),
+            "a booked leg carries no reason/audit_type"
+        );
+    }
+
+    #[test]
+    fn parse_swap_confirmed_not_booked_carries_reason_and_audit_type() {
+        let body = swap_event_body(
+            EVENT_TRANSACTION_CONFIRMED,
+            "CONFIRMED",
+            "PROGRAM_CALL",
+            r#"{"token_address":"Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB","symbol":"",
+                "amount":"1500","decimals":0,"booked":false,"accounting_status":"REVIEW_REQUIRED",
+                "reason":"currency_code_not_found_or_inactive","audit_type":"SWAP_INCOMING_ASSET_UNREGISTERED"}"#,
+        );
+        let event = parse_event(&body).unwrap();
+        assert_eq!(event.operation, "PROGRAM_CALL");
+        let leg = event.swap_incoming.unwrap();
+        assert!(!leg.booked);
+        assert_eq!(leg.accounting_status, SWAP_ACCOUNTING_REVIEW_REQUIRED);
+        assert_eq!(
+            leg.reason.as_deref(),
+            Some("currency_code_not_found_or_inactive")
+        );
+        assert_eq!(
+            leg.audit_type.as_deref(),
+            Some("SWAP_INCOMING_ASSET_UNREGISTERED")
+        );
+        // funds arrived on-chain but were not credited: the amount is the on-chain amount, not "0"
+        assert_eq!(leg.amount, "1500");
+        assert_eq!(
+            (leg.symbol.as_str(), leg.decimals),
+            ("", 0),
+            "unregistered asset is not invented"
+        );
+    }
+
+    #[test]
+    fn parse_swap_failed_is_not_applicable() {
+        let body = swap_event_body(
+            EVENT_TRANSACTION_FAILED,
+            "FAILED",
+            "CONTRACT_CALL",
+            r#"{"token_address":"0xa55a927f2211fe52188526ed7e779b7298646e75","symbol":"AAPLx",
+                "amount":"0","decimals":18,"booked":false,"accounting_status":"NOT_APPLICABLE",
+                "reason":"onchain_execution_failed"}"#,
+        );
+        let event = parse_event(&body).unwrap();
+        assert_eq!(event.event_type, EVENT_TRANSACTION_FAILED);
+        let leg = event.swap_incoming.unwrap();
+        assert!(!leg.booked);
+        assert_eq!(leg.accounting_status, SWAP_ACCOUNTING_NOT_APPLICABLE);
+        assert_eq!(leg.reason.as_deref(), Some("onchain_execution_failed"));
+        assert!(
+            leg.audit_type.is_none(),
+            "a reverted swap opens no SWAP_INCOMING_* audit"
+        );
+        assert_eq!(leg.amount, "0");
+    }
+
+    #[test]
+    fn parse_legacy_event_without_operation_or_swap_incoming() {
+        // A payload from a message service that predates both fields must still parse,
+        // and re-serialising it must not invent a swap_incoming key.
+        let body = br#"{
+            "event_id":"evt_legacy","event_type":"transaction.confirmed",
+            "event_time":"2026-09-15T08:00:00Z","source_id":"tx-1","wallet_id":"w-1",
+            "account_id":"a-1","status":"CONFIRMED","transaction_type":"OUTBOUND",
+            "chain":"base","network":"mainnet","txhash":"0xabc","block_number":100,
+            "from":"0xa","to":"0xb","symbol":"USDC","contract_address":"0xusdc",
+            "amount":"1000000","decimals":6,"confirmations":0,"required_confirmations":12,
+            "created_at":"2026-09-15T07:59:00Z","confirmed_at":"2026-09-15T08:00:00Z",
+            "risk_checked":false,"risk_score":0.0,"risk_level":"UNSCANNED","data":""
+        }"#;
+        let event = parse_event(body).unwrap();
+        assert_eq!(event.operation, "");
+        assert!(event.swap_incoming.is_none());
+        let out: serde_json::Value = serde_json::to_value(&event).unwrap();
+        assert!(
+            out.get("swap_incoming").is_none(),
+            "swap_incoming must be skipped when None"
+        );
+        assert_eq!(out["operation"], "");
     }
 
     #[test]
