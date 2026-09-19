@@ -151,8 +151,10 @@ amounts are in token units. Policy limits are authored per token in token units
 (`asset_rules.limits[chain][token]`, e.g. `"0.5"`); the gateway converts them with the
 token's registered decimals, checks registration before limits, and limit rejections
 quote both sides in token units (`limit_per_transaction: 1 CORZx exceeds
-per-transaction limit 0.5 CORZx`). The leg that is limit-checked is the one we pay:
-`incoming` for CONTRACT_CALL, our outgoing `TransferChecked` for PROGRAM_CALL.
+per-transaction limit 0.5 CORZx`). `limits` is the only place limits live - one entry
+per token we pay with, `single` and `daily` both required; a token without an entry is
+`limit_not_configured`. The leg that is limit-checked is the one we pay: `incoming`
+for CONTRACT_CALL, our outgoing `TransferChecked` for PROGRAM_CALL.
 
 ```rust
 use paratro_sdk::{
@@ -307,7 +309,12 @@ releases can add tags, and TSS / broadcast failures arrive without one (`engine
 rejected the transaction`), so match on the tags you handle and treat the rest as
 "failed, reason in the message" - for example `limit_invalid` (a per-token
 `asset_rules.limits` entry that does not convert to a whole number of smallest units)
-has no constant in 1.8 yet, but `reason_tag()` still returns it.
+has no constant in 1.8 yet, but `reason_tag()` still returns it. The opposite also
+happens: `reason_tag::LIMIT_DECIMALS_AMBIGUOUS` stays for source compatibility, but the
+gateway no longer emits it - the policy-wide `single_limit` / `daily_limit` it guarded
+were removed on 2026-09-19, every token now has its own `asset_rules.limits` entry (one
+without an entry is `limit_not_configured`), and a policy that still carries the old
+keys is rejected as a whole with `403`.
 
 ### Reading transactions
 
