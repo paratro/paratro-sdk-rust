@@ -146,7 +146,12 @@ let resp = client
 Amounts are **smallest-unit decimal integer strings**. The contract address is
 **not** sent — the gateway takes it from the policy (`allowed_contracts[chain]`) —
 and native value is always 0. `incoming` is what we pay (its `from` is filled by the
-gateway = `from_address`); `outgoing` is what the counterparty pays us.
+gateway = `from_address`); `outgoing` is what the counterparty pays us. Only `TRANSFER`
+amounts are in token units. Policy limits are authored per token in token units
+(`asset_rules.limits[chain][token]`, e.g. `"0.5"`); the gateway converts them with the
+token's registered decimals, checks registration before limits, and limit rejections
+quote both sides in token units (`limit_per_transaction: 1 CORZx exceeds
+per-transaction limit 0.5 CORZx`).
 
 ```rust
 use paratro_sdk::{
@@ -299,7 +304,9 @@ step of a `CONTRACT_CALL` (`permit_owner_mismatch`, `permit_spender_mismatch`,
 `permit_token_mismatch`, `permit_token_not_registered`). The set is not closed: new
 releases can add tags, and TSS / broadcast failures arrive without one (`engine
 rejected the transaction`), so match on the tags you handle and treat the rest as
-"failed, reason in the message".
+"failed, reason in the message" - for example `limit_invalid` (a per-token
+`asset_rules.limits` entry that does not convert to a whole number of smallest units)
+has no constant in 1.8 yet, but `reason_tag()` still returns it.
 
 ### Reading transactions
 
