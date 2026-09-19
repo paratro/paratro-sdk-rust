@@ -151,7 +151,8 @@ amounts are in token units. Policy limits are authored per token in token units
 (`asset_rules.limits[chain][token]`, e.g. `"0.5"`); the gateway converts them with the
 token's registered decimals, checks registration before limits, and limit rejections
 quote both sides in token units (`limit_per_transaction: 1 CORZx exceeds
-per-transaction limit 0.5 CORZx`).
+per-transaction limit 0.5 CORZx`). The leg that is limit-checked is the one we pay:
+`incoming` for CONTRACT_CALL, our outgoing `TransferChecked` for PROGRAM_CALL.
 
 ```rust
 use paratro_sdk::{
@@ -235,7 +236,7 @@ match client.create_transaction(&req).await {
     Err(err) => match err.kind() {
         Some(ApiErrorKind::Rejected) => match err.reason_tag() {
             Some(reason_tag::EXPIRATION_PASSED) => { /* fetch a fresh quote */ }
-            Some(reason_tag::LIMIT_DAILY) | Some(reason_tag::LIMIT_PER_TRANSACTION) => { /* over policy limit */ }
+            Some(reason_tag::LIMIT_DAILY) | Some(reason_tag::LIMIT_PER_TRANSACTION) => { /* the leg we pay is over the token's limit */ }
             Some(tag) => eprintln!("rejected: {tag}"),
             None => eprintln!("rejected: {}", err.message().unwrap_or("")),
         },
