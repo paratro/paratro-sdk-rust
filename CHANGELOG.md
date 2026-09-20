@@ -18,8 +18,10 @@ same error message in the Go and Python SDKs.
   non-empty and start with `http://` or `https://`, trailing slashes are stripped
   (`client.config().base_url` holds the normalized value), and anything else is
   `Error::InvalidConfig("base URL must be an absolute http(s) URL, e.g.
-  https://api-sandbox.paratro.com or your private gateway")`. `with_timeout` and
-  the public `base_url` / `timeout` fields are unchanged.
+  https://<gateway-host> (Paratro cloud or your private gateway)")` — the message
+  names no gateway host, so a private deployment never sees a Paratro cloud
+  address in it. `with_timeout` and the public `base_url` / `timeout` fields are
+  unchanged.
 
   | Before (1.8.1) | After (1.9.0) |
   |---|---|
@@ -30,7 +32,8 @@ same error message in the Go and Python SDKs.
 
 - `tests/integration_test.rs` reads the gateway from `MPC_BASE_URL` and is skipped
   when it, `MPC_API_KEY` or `MPC_API_SECRET` is unset; it no longer targets the
-  Paratro sandbox by default.
+  Paratro sandbox by default. `tests/docs_guard.rs` keeps the Paratro cloud hosts
+  out of every shipped file except the README / CHANGELOG tables.
 
 ### Added
 

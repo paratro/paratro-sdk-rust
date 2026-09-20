@@ -27,8 +27,11 @@ pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(200);
 
 /// Message of the [`Error::InvalidConfig`] that [`crate::MpcClient::new`] returns
 /// for a base URL that is not an absolute `http(s)://` URL. Word for word the
-/// same in the Go and Python SDKs.
-pub(crate) const BASE_URL_ERROR: &str = "base URL must be an absolute http(s) URL, e.g. https://api-sandbox.paratro.com or your private gateway";
+/// same in the Go and Python SDKs. It names no gateway host: the SDK also runs
+/// against private deployments, so the example is the `https://<gateway-host>`
+/// placeholder used throughout the docs (the Paratro cloud hosts are listed in
+/// the README only).
+pub(crate) const BASE_URL_ERROR: &str = "base URL must be an absolute http(s) URL, e.g. https://<gateway-host> (Paratro cloud or your private gateway)";
 
 /// Configuration for the MPC SDK.
 ///
@@ -141,6 +144,27 @@ mod tests {
         ] {
             assert_eq!(normalize_base_url(given).unwrap(), want, "{given:?}");
         }
+    }
+
+    #[test]
+    fn base_url_error_points_at_the_placeholder_not_a_cloud_host() {
+        // The same SDK talks to private gateways, so the error a private
+        // customer sees must not advertise a Paratro cloud host. Assembled from
+        // parts so a plain grep for the host over src/ finds nothing.
+        let cloud = format!("paratro{}", ".com");
+        assert!(
+            BASE_URL_ERROR.contains("absolute http(s) URL"),
+            "{BASE_URL_ERROR}"
+        );
+        assert!(
+            BASE_URL_ERROR.contains("https://<gateway-host>"),
+            "{BASE_URL_ERROR}"
+        );
+        assert!(
+            BASE_URL_ERROR.contains("private gateway"),
+            "{BASE_URL_ERROR}"
+        );
+        assert!(!BASE_URL_ERROR.contains(&cloud), "{BASE_URL_ERROR}");
     }
 
     #[test]
