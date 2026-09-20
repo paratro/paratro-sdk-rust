@@ -414,6 +414,12 @@ fn handle_webhook(body: &[u8], timestamp: &str, signature: &str) -> Result<(), B
         webhook::EVENT_X402_SETTLEMENT_CONFIRMED => { /* x402 settlement credited to our address; transaction_type == "INBOUND" */ }
         _ => {}
     }
+    // event.operation (TRANSFER / PROGRAM_CALL / CONTRACT_CALL / DEPOSIT / X402) says what kind of
+    // movement this is. PROGRAM_CALL / CONTRACT_CALL swaps also carry the counter-asset leg:
+    if let Some(leg) = &event.swap_incoming {
+        if leg.booked { /* credit leg.amount (smallest unit) of leg.token_address */ }
+        else { /* not credited: see leg.reason / leg.audit_type */ }
+    }
     Ok(())
 }
 ```
