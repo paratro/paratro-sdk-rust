@@ -91,10 +91,14 @@ impl Config {
 /// after the scheme. The Go and Python SDKs apply the same rule.
 pub(crate) fn normalize_base_url(base_url: &str) -> Result<String, Error> {
     let url = base_url.trim_end_matches('/');
+    // Same rule as the Go and Python SDKs: http(s) scheme (case-sensitive) and a
+    // non-empty host, so "https://" and "https:///path" fail here instead of as
+    // a connection error on the first request.
     let host = url
         .strip_prefix("https://")
         .or_else(|| url.strip_prefix("http://"))
-        .filter(|rest| !rest.is_empty());
+        .map(|rest| rest.split('/').next().unwrap_or(""))
+        .filter(|host| !host.is_empty() && !host.chars().any(char::is_whitespace));
     match host {
         Some(_) => Ok(url.to_string()),
         None => Err(Error::InvalidConfig(BASE_URL_ERROR.to_string())),
@@ -132,6 +136,24 @@ mod tests {
         let cfg = Config::new("https://gateway.example").with_timeout(Duration::from_secs(5));
         assert_eq!(cfg.timeout, Duration::from_secs(5));
         assert_eq!(cfg.base_url, "https://gateway.example");
+    }
+
+    #[test]
+    fn normalize_base_url_requires_a_host() {
+        for bad in [
+            "https://",
+            "https:///path",
+            "http://",
+            "https://gw example",
+            "HTTPS://gateway.example",
+            "gateway.example",
+        ] {
+            assert!(normalize_base_url(bad).is_err(), "{bad:?} must be rejected");
+        }
+        assert_eq!(
+            normalize_base_url("https://mpcapi.example/api/").unwrap(),
+            "https://mpcapi.example/api"
+        );
     }
 
     #[test]
