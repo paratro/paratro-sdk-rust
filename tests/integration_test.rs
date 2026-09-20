@@ -5,17 +5,26 @@ use paratro_sdk::*;
 
 static ACTIVE_WALLET_ID: OnceLock<String> = OnceLock::new();
 
+/// The gateway under test is never hard-coded: `MPC_BASE_URL` names it (Paratro
+/// cloud or a private deployment). When it — or `MPC_API_KEY` / `MPC_API_SECRET`
+/// — is unset or empty, every integration test is skipped.
 fn get_test_client() -> Option<MpcClient> {
     let _ = dotenvy::dotenv();
 
+    let base_url = env::var("MPC_BASE_URL").ok()?;
     let api_key = env::var("MPC_API_KEY").ok()?;
     let api_secret = env::var("MPC_API_SECRET").ok()?;
 
-    if api_key.is_empty() || api_secret.is_empty() {
+    if base_url.is_empty() || api_key.is_empty() || api_secret.is_empty() {
         return None;
     }
 
-    MpcClient::new(api_key, api_secret, Config::sandbox()).ok()
+    // A set but unusable MPC_BASE_URL is a configuration mistake, not a reason
+    // to skip silently.
+    Some(
+        MpcClient::new(api_key, api_secret, Config::new(base_url))
+            .expect("MPC_BASE_URL must be an absolute http(s) URL"),
+    )
 }
 
 fn skip_integration() -> bool {
@@ -363,11 +372,29 @@ fn test_version() {
 
 #[test]
 fn test_new_mpc_client_validation() {
-    let result = MpcClient::new("", "secret", Config::sandbox());
+    let result = MpcClient::new("", "secret", Config::new("https://gateway.example"));
     assert!(result.is_err(), "expected error for empty apiKey");
 
-    let result = MpcClient::new("key", "", Config::sandbox());
+    let result = MpcClient::new("key", "", Config::new("https://gateway.example"));
     assert!(result.is_err(), "expected error for empty apiSecret");
+
+    // The base URL is required and must be an absolute http(s) URL.
+    let result = MpcClient::new("key", "secret", Config::new(""));
+    assert!(result.is_err(), "expected error for empty base URL");
+
+    let result = MpcClient::new("key", "secret", Config::new("gateway.example"));
+    assert!(
+        result.is_err(),
+        "expected error for base URL without scheme"
+    );
+
+    let client = MpcClient::new("key", "secret", Config::new("https://gateway.example/"))
+        .expect("an absolute https URL is accepted");
+    assert_eq!(
+        client.config().base_url,
+        "https://gateway.example",
+        "trailing slash is stripped"
+    );
 }
 
 // ============ Error Helper Tests ============

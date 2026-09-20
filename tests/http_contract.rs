@@ -813,7 +813,7 @@ async fn configured_timeout_bounds_the_request() {
     let client = MpcClient::new(
         "fixture-key",
         "fixture-secret",
-        Config::custom(&base_url).with_timeout(std::time::Duration::from_millis(300)),
+        Config::new(&base_url).with_timeout(std::time::Duration::from_millis(300)),
     )
     .unwrap();
     let started = std::time::Instant::now();

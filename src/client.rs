@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::config::Config;
+use crate::config::{self, Config};
 use crate::error::{code, Error, ErrorBody};
 use crate::token::TokenManager;
 
@@ -27,10 +27,16 @@ pub(crate) struct Reply<R> {
 
 impl MpcClient {
     /// Creates a new MPC SDK client.
+    ///
+    /// Fails with [`Error::InvalidConfig`] when `api_key` or `api_secret` is
+    /// empty, or when `config.base_url` is not an absolute `http://` /
+    /// `https://` URL. Trailing slashes are stripped from the base URL;
+    /// [`MpcClient::config`] returns the normalized value. The SDK has no
+    /// built-in gateway address — see [`Config::new`].
     pub fn new(
         api_key: impl Into<String>,
         api_secret: impl Into<String>,
-        config: Config,
+        mut config: Config,
     ) -> Result<Self, Error> {
         let api_key = api_key.into();
         let api_secret = api_secret.into();
@@ -41,6 +47,11 @@ impl MpcClient {
         if api_secret.is_empty() {
             return Err(Error::InvalidConfig("apiSecret is required".to_string()));
         }
+
+        // The gateway address is never built in: it must be an absolute http(s)
+        // URL (Paratro cloud or a private deployment). Trailing slashes are
+        // stripped so `url()` can append `/api/v1/...` verbatim.
+        config.base_url = config::normalize_base_url(&config.base_url)?;
 
         // One timeout for every exchange, the auth call included: a shorter
         // auth timeout would cut a PROGRAM_CALL / CONTRACT_CALL short at the
@@ -202,4 +213,55 @@ fn decode<R: DeserializeOwned>(status: u16, bytes: &[u8]) -> Result<Reply<R>, Er
     }
     let body = serde_json::from_slice(bytes).map_err(|source| Error::Decode { status, source })?;
     Ok(Reply { status, body })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::BASE_URL_ERROR;
+
+    fn client_with(base_url: &str) -> Result<MpcClient, Error> {
+        MpcClient::new("key", "secret", Config::new(base_url))
+    }
+
+    #[test]
+    fn new_normalizes_the_base_url() {
+        let client = client_with("https://gateway.example///").unwrap();
+        assert_eq!(client.config().base_url, "https://gateway.example");
+        assert_eq!(
+            client.url("/api/v1/wallets"),
+            "https://gateway.example/api/v1/wallets"
+        );
+        assert_eq!(
+            client_with("http://127.0.0.1:8080/")
+                .unwrap()
+                .config()
+                .base_url,
+            "http://127.0.0.1:8080"
+        );
+    }
+
+    #[test]
+    fn new_rejects_a_base_url_that_is_not_an_absolute_http_url() {
+        for given in ["", "gateway.example", "ftp://gateway.example", "https://"] {
+            match client_with(given) {
+                Err(Error::InvalidConfig(msg)) => assert_eq!(msg, BASE_URL_ERROR, "{given:?}"),
+                Err(other) => panic!("{given:?}: expected InvalidConfig, got {other:?}"),
+                Ok(_) => panic!("{given:?}: expected InvalidConfig"),
+            }
+        }
+    }
+
+    #[test]
+    fn new_still_requires_key_and_secret() {
+        let cfg = || Config::new("https://gateway.example");
+        assert!(matches!(
+            MpcClient::new("", "secret", cfg()),
+            Err(Error::InvalidConfig(_))
+        ));
+        assert!(matches!(
+            MpcClient::new("key", "", cfg()),
+            Err(Error::InvalidConfig(_))
+        ));
+    }
 }

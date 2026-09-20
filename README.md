@@ -6,11 +6,13 @@
 
 Official Rust SDK for the Paratro MPC Wallet Gateway.
 
-> **1.8.1 is not a purely additive release.** `POST /api/v1/transfer` and
-> `POST /api/v1/x402/sign` were retired by the gateway (HTTP 410); transactions now go
-> through one entry, `POST /api/v1/transactions`, with an `operation` field. The crate
-> name is unchanged. See the **⚠️ Breaking** section of [CHANGELOG.md](CHANGELOG.md)
-> for the 1.6 → 1.8.1 migration.
+> **1.9.0 is a breaking release.** The gateway base URL is now required and always
+> passed explicitly — `Config::new("https://<gateway-host>")` — because the SDK is
+> also used against private deployments of the gateway; `Config::sandbox()` /
+> `production()` / `custom()` are gone. 1.8.1 had already moved every transaction to
+> the single entry `POST /api/v1/transactions` (`POST /api/v1/transfer` and
+> `POST /api/v1/x402/sign` answer HTTP 410). The crate name is unchanged. See the
+> **⚠️ Breaking** sections of [CHANGELOG.md](CHANGELOG.md) for the before/after tables.
 
 ## Features
 
@@ -26,7 +28,7 @@ Official Rust SDK for the Paratro MPC Wallet Gateway.
 
 ```toml
 [dependencies]
-paratro-sdk = "1.8"
+paratro-sdk = "1.9"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -50,9 +52,30 @@ The caller's IP must be in the client's IP allowlist.
 ```rust
 use paratro_sdk::{Config, MpcClient};
 
-let client = MpcClient::new("your-api-key", "your-api-secret", Config::sandbox())?;
-// Config::production(), or Config::custom("https://your-gateway.example.com")
+// The gateway address is always passed explicitly — the SDK has no built-in default.
+let client = MpcClient::new(
+    "your-api-key",
+    "your-api-secret",
+    Config::new("https://<gateway-host>"),
+)?;
 ```
+
+### Gateway base URL
+
+`Config::new(base_url)` is the only constructor; there are no per-environment presets.
+Pass the base URL of the gateway you were given. `Config::new` itself never fails;
+`MpcClient::new` requires an absolute `http://` / `https://` URL, strips trailing
+slashes (`client.config().base_url` holds the normalized value) and otherwise returns
+`Error::InvalidConfig`.
+
+Paratro cloud:
+
+| Environment | Base URL |
+|---|---|
+| sandbox | `https://api-sandbox.paratro.com` |
+| production | `https://api.paratro.com` |
+
+Private deployments: use the gateway address given to you by your operations team.
 
 ### HTTP timeout
 
@@ -67,7 +90,8 @@ client-side timeout. If the SDK gave up first you would lose the `tx_id` while t
 already exists under your `reference_id` (a resend answers `400 Duplicate reference_id`,
 and the API cannot search by `reference_id`); 150 s is exactly when the gateway answers
 `202`, so it is not enough. Keep the default for clients that send those two
-operations; `Config::sandbox().with_timeout(Duration::from_secs(10))` is fine for a
+operations; `Config::new("https://<gateway-host>").with_timeout(Duration::from_secs(10))`
+is fine for a
 client that only reads or sends `TRANSFER`. Same default as the Go
 (`paratro.DefaultTimeout`) and Python (`paratro.DEFAULT_TIMEOUT`) SDKs.
 
@@ -452,11 +476,15 @@ tests/
 ```bash
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
-SKIP_INTEGRATION_TESTS=true cargo test
+cargo test
+# against a real gateway (Paratro cloud or a private deployment):
+MPC_BASE_URL=https://<gateway-host> MPC_API_KEY=... MPC_API_SECRET=... cargo test --test integration_test
 ```
 
-`tests/integration_test.rs` talks to the sandbox when `MPC_API_KEY` / `MPC_API_SECRET`
-are set and `SKIP_INTEGRATION_TESTS` is not `true`.
+`tests/integration_test.rs` talks to the gateway named by `MPC_BASE_URL` when it,
+`MPC_API_KEY` and `MPC_API_SECRET` are all set (a `.env` file is read too) and
+`SKIP_INTEGRATION_TESTS` is not `true`; otherwise every integration test is skipped.
+No gateway address is written into the tests.
 
 ## Support
 

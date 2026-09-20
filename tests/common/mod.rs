@@ -108,7 +108,7 @@ impl FakeGateway {
         });
 
         let client =
-            MpcClient::new("fixture-key", "fixture-secret", Config::custom(&base_url)).unwrap();
+            MpcClient::new("fixture-key", "fixture-secret", Config::new(&base_url)).unwrap();
         Self {
             client,
             base_url,

@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use crate::error::Error;
+
 /// HTTP timeout used when [`Config::timeout`] is left at its default.
 ///
 /// `PROGRAM_CALL` / `CONTRACT_CALL` are synchronous: the gateway keeps the
@@ -23,9 +25,32 @@ use std::time::Duration;
 /// `paratro.DEFAULT_TIMEOUT` in the Python SDK.
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(200);
 
+/// Message of the [`Error::InvalidConfig`] that [`crate::MpcClient::new`] returns
+/// for a base URL that is not an absolute `http(s)://` URL. Word for word the
+/// same in the Go and Python SDKs.
+pub(crate) const BASE_URL_ERROR: &str = "base URL must be an absolute http(s) URL, e.g. https://api-sandbox.paratro.com or your private gateway";
+
 /// Configuration for the MPC SDK.
+///
+/// The SDK has no built-in environment: the gateway base URL is required and is
+/// always passed explicitly, because the same SDK talks to Paratro cloud and to
+/// private deployments of the gateway. Use the address you were given — the
+/// Paratro cloud hosts are listed in the README; a private deployment's address
+/// comes from its operations team.
+///
+/// ```
+/// use std::time::Duration;
+/// use paratro_sdk::Config;
+///
+/// let cfg = Config::new("https://<gateway-host>").with_timeout(Duration::from_secs(10));
+/// assert_eq!(cfg.base_url, "https://<gateway-host>");
+/// assert_eq!(cfg.timeout, Duration::from_secs(10));
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
+    /// Base URL of the gateway: an absolute `http://` / `https://` URL with no
+    /// path. Stored as given; [`crate::MpcClient::new`] validates it and strips
+    /// trailing slashes (see [`Config::new`]).
     pub base_url: String,
     /// Bounds every HTTP exchange the SDK makes (connect, request, response),
     /// including `POST /api/v1/auth/token`. Defaults to [`DEFAULT_TIMEOUT`]
@@ -35,18 +60,15 @@ pub struct Config {
 }
 
 impl Config {
-    /// Returns configuration for the sandbox environment.
-    pub fn sandbox() -> Self {
-        Self::custom("https://api-sandbox.paratro.com")
-    }
-
-    /// Returns configuration for the production environment.
-    pub fn production() -> Self {
-        Self::custom("https://api.paratro.com")
-    }
-
-    /// Returns a custom configuration with the specified base URL.
-    pub fn custom(base_url: impl Into<String>) -> Self {
+    /// Returns the configuration for the gateway at `base_url`, with the default
+    /// timeout ([`DEFAULT_TIMEOUT`]). This is the only constructor; there are no
+    /// per-environment presets.
+    ///
+    /// `base_url` is not checked here — constructing a `Config` never fails.
+    /// [`crate::MpcClient::new`] requires it to be non-empty and to start with
+    /// `http://` or `https://`, strips trailing slashes, and otherwise fails with
+    /// [`Error::InvalidConfig`].
+    pub fn new(base_url: impl Into<String>) -> Self {
         Self {
             base_url: base_url.into(),
             timeout: DEFAULT_TIMEOUT,
@@ -57,6 +79,22 @@ impl Config {
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
         self
+    }
+}
+
+/// Validates a gateway base URL and returns it without trailing slashes.
+///
+/// Accepted: non-empty, starts with `http://` or `https://`, and has something
+/// after the scheme. The Go and Python SDKs apply the same rule.
+pub(crate) fn normalize_base_url(base_url: &str) -> Result<String, Error> {
+    let url = base_url.trim_end_matches('/');
+    let host = url
+        .strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"))
+        .filter(|rest| !rest.is_empty());
+    match host {
+        Some(_) => Ok(url.to_string()),
+        None => Err(Error::InvalidConfig(BASE_URL_ERROR.to_string())),
     }
 }
 
@@ -72,18 +110,56 @@ mod tests {
         // Same default as Go (paratro.DefaultTimeout) / Python (DEFAULT_TIMEOUT).
         assert_eq!(DEFAULT_TIMEOUT, Duration::from_secs(200));
         assert!(DEFAULT_TIMEOUT > Duration::from_secs(180));
-        assert_eq!(Config::sandbox().timeout, DEFAULT_TIMEOUT);
-        assert_eq!(Config::production().timeout, DEFAULT_TIMEOUT);
+        assert_eq!(Config::new("http://127.0.0.1:1").timeout, DEFAULT_TIMEOUT);
+    }
+
+    #[test]
+    fn new_stores_the_base_url_as_given() {
+        // Validation lives in MpcClient::new: constructing a Config never
+        // fails, even for a URL the client will later refuse.
         assert_eq!(
-            Config::custom("http://127.0.0.1:1").timeout,
-            DEFAULT_TIMEOUT
+            Config::new("https://gateway.example/").base_url,
+            "https://gateway.example/"
         );
+        assert_eq!(Config::new("").base_url, "");
     }
 
     #[test]
     fn with_timeout_overrides_the_default() {
-        let cfg = Config::sandbox().with_timeout(Duration::from_secs(5));
+        let cfg = Config::new("https://gateway.example").with_timeout(Duration::from_secs(5));
         assert_eq!(cfg.timeout, Duration::from_secs(5));
-        assert_eq!(cfg.base_url, "https://api-sandbox.paratro.com");
+        assert_eq!(cfg.base_url, "https://gateway.example");
+    }
+
+    #[test]
+    fn normalize_base_url_accepts_absolute_http_urls_and_strips_trailing_slashes() {
+        for (given, want) in [
+            ("https://gateway.example", "https://gateway.example"),
+            ("https://gateway.example/", "https://gateway.example"),
+            ("https://gateway.example///", "https://gateway.example"),
+            ("http://127.0.0.1:8080/", "http://127.0.0.1:8080"),
+        ] {
+            assert_eq!(normalize_base_url(given).unwrap(), want, "{given:?}");
+        }
+    }
+
+    #[test]
+    fn normalize_base_url_rejects_anything_else() {
+        for given in [
+            "",
+            "/",
+            "gateway.example",
+            "//gateway.example",
+            "ftp://gateway.example",
+            "https://",
+            "https:///",
+            "HTTPS://gateway.example",
+            " https://gateway.example",
+        ] {
+            match normalize_base_url(given) {
+                Err(Error::InvalidConfig(msg)) => assert_eq!(msg, BASE_URL_ERROR, "{given:?}"),
+                other => panic!("{given:?}: expected InvalidConfig, got {other:?}"),
+            }
+        }
     }
 }

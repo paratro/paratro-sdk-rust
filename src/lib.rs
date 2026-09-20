@@ -1,7 +1,12 @@
 //! Official Rust SDK for the Paratro MPC Wallet Gateway.
 //!
-//! # 1.8.1 at a glance
+//! # 1.9.0 at a glance
 //!
+//! * No built-in gateway address: [`Config::new`] takes the base URL of the
+//!   gateway you were given — Paratro cloud or a private deployment — and
+//!   [`MpcClient::new`] rejects anything that is not an absolute `http(s)://`
+//!   URL. There are no per-environment presets; the Paratro cloud hosts are
+//!   listed in the README only.
 //! * One transaction entry: [`MpcClient::create_transaction`] → `POST /api/v1/transactions`
 //!   with `operation` = `TRANSFER` / `PROGRAM_CALL` / `CONTRACT_CALL`
 //!   ([`CreateTransactionRequest`]). [`MpcClient::create_transfer`] is kept as a
