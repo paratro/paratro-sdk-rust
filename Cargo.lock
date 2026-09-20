@@ -738,7 +738,7 @@ dependencies = [
 
 [[package]]
 name = "paratro-sdk"
-version = "1.8.1"
+version = "1.9.0"
 dependencies = [
  "dotenvy",
  "hex",

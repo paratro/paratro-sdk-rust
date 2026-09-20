@@ -1,6 +1,6 @@
 [package]
 name = "paratro-sdk"
-version = "1.8.1"
+version = "1.9.0"
 edition = "2021"
 # Minimum toolchain verified with `cargo +1.85 check --locked --all-targets`.
 # The crate's own code needs far less; the locked dependency tree (reqwest →

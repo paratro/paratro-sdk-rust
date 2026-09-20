@@ -1,6 +1,36 @@
 # Changelog
 
-## Unreleased
+## 1.9.0 — 2026-09-20
+
+The SDK is now used against private deployments of the gateway as well as Paratro
+cloud, so it no longer knows any gateway address. **1.9.0 is a breaking release**:
+the base URL is required and always passed explicitly. Same change, same rule and
+same error message in the Go and Python SDKs.
+
+### ⚠️ Breaking
+
+- **`Config::sandbox()`, `Config::production()` and `Config::custom()` are removed;
+  `Config::new(base_url)` is the only constructor.** There is no built-in
+  environment — pass the base URL of the gateway you were given. Paratro cloud:
+  sandbox `https://api-sandbox.paratro.com`, production `https://api.paratro.com`;
+  a private deployment uses the gateway address from its operations team.
+  `Config::new` never fails; `MpcClient::new` validates the URL: it must be
+  non-empty and start with `http://` or `https://`, trailing slashes are stripped
+  (`client.config().base_url` holds the normalized value), and anything else is
+  `Error::InvalidConfig("base URL must be an absolute http(s) URL, e.g.
+  https://api-sandbox.paratro.com or your private gateway")`. `with_timeout` and
+  the public `base_url` / `timeout` fields are unchanged.
+
+  | Before (1.8.1) | After (1.9.0) |
+  |---|---|
+  | `Config::sandbox()` | `Config::new("https://api-sandbox.paratro.com")` |
+  | `Config::production()` | `Config::new("https://api.paratro.com")` |
+  | `Config::custom("https://<gateway-host>")` | `Config::new("https://<gateway-host>")` |
+  | `Config::sandbox().with_timeout(d)` | `Config::new("https://<gateway-host>").with_timeout(d)` |
+
+- `tests/integration_test.rs` reads the gateway from `MPC_BASE_URL` and is skipped
+  when it, `MPC_API_KEY` or `MPC_API_SECRET` is unset; it no longer targets the
+  Paratro sandbox by default.
 
 ### Added
 
